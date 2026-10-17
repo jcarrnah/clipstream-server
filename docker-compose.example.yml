@@ -1,0 +1,10 @@
+services:
+  clipstream-server:
+    image: ghcr.io/jcarrnah/clipstream-server:latest
+    container_name: clipstream-server
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    env_file: .env
+    # volumes:
+    #   - ./config:/config   # for CATEGORIES_FILE
