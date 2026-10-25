@@ -18,6 +18,7 @@ from .upgrades import Upgrades
 from .config import settings
 from .dispatcharr import Dispatcharr
 from .livetv import LiveTv
+from .stalls import Stalls
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("clipstream")
@@ -27,6 +28,7 @@ log = logging.getLogger("clipstream")
 async def lifespan(app: FastAPI):
     app.state.jellyfin = httpx.AsyncClient(base_url=settings.jellyfin_url, timeout=20)
     app.state.livetv = None
+    app.state.stalls = None
     app.state.calendar = Calendar(settings) if settings.calendar_enabled else None
     app.state.upgrades = Upgrades(settings) if settings.calendar_enabled else None
     if app.state.upgrades:
@@ -36,6 +38,7 @@ async def lifespan(app: FastAPI):
     if settings.livetv_enabled:
         dispatcharr = Dispatcharr(settings.dispatcharr_url, settings.dispatcharr_username, settings.dispatcharr_password)
         app.state.livetv = LiveTv(settings, dispatcharr, categories.load(settings.categories_file))
+        app.state.stalls = Stalls(dispatcharr)
         await app.state.livetv.start()
     log.info("ready: livetv=%s calendar=%s requests=%s", settings.livetv_enabled, settings.calendar_enabled,
              settings.requests_enabled)
@@ -118,6 +121,21 @@ async def livetv_guide(
     ids = {int(x) for x in channels.split(",") if x.strip().isdigit()} if channels else None
     now = datetime.now(timezone.utc)
     return _livetv().guide(ids, now - timedelta(minutes=30), now + timedelta(hours=hours))
+
+
+@app.post("/api/livetv/stalls")
+async def livetv_stall(report: dict = Body(...), user: dict = Depends(current_user)):
+    """The app reports a Live TV stall: buffering mid-stream (how long), or a stream that failed."""
+    _livetv()
+    app.state.stalls.add(report, user)
+    return {"ok": True}
+
+
+@app.get("/api/livetv/stalls")
+async def livetv_stalls(limit: int = Query(default=50, ge=1, le=500), user: dict = Depends(current_user)):
+    """Recent stalls, newest first, each with Dispatcharr's events for that channel around it."""
+    _livetv()
+    return await app.state.stalls.recent(limit)
 
 
 @app.get("/api/livetv/logo/{logo_id}")

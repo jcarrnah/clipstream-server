@@ -41,8 +41,8 @@ class Settings:
     # Optional JSON file overriding the built-in category rules (see app/categories.py).
     categories_file: str | None = field(default_factory=lambda: _env("CATEGORIES_FILE"))
 
-    channel_refresh_seconds: int = field(default_factory=lambda: int(_env("CHANNEL_REFRESH_SECONDS", "300")))
-    guide_refresh_seconds: int = field(default_factory=lambda: int(_env("GUIDE_REFRESH_SECONDS", "900")))
+    channel_refresh_seconds: int = field(default_factory=lambda: int(_env("CHANNEL_REFRESH_SECONDS", "120")))
+    guide_refresh_seconds: int = field(default_factory=lambda: int(_env("GUIDE_REFRESH_SECONDS", "300")))
     guide_hours_ahead: int = field(default_factory=lambda: int(_env("GUIDE_HOURS_AHEAD", "24")))
 
     @property

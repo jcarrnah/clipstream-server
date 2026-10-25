@@ -1,5 +1,5 @@
 """Dispatcharr client. Logs in once and refreshes the JWT; Dispatcharr throttles repeated logins. Reads channels, groups,
-logos and the guide; the only write is a channel's stream list (backup streams, when enabled)."""
+logos, the guide and its event log; the only write is a channel's stream list (backup streams, when enabled)."""
 from __future__ import annotations
 
 import asyncio
@@ -78,6 +78,17 @@ class Dispatcharr:
     async def guide(self, start: datetime, end: datetime) -> list[dict]:
         data = await self.get("/api/epg/grid/", start=start.isoformat(), end=end.isoformat())
         return data.get("data", []) if isinstance(data, dict) else data
+
+    async def system_events(self, limit: int = 500) -> list[dict]:
+        """Newest first: channel starts/stops, buffering, failovers, reconnects, refreshes."""
+        out: list[dict] = []
+        while len(out) < limit:
+            page = await self.get("/api/core/system-events/", limit=min(300, limit - len(out)), offset=len(out))
+            events = (page or {}).get("events", [])
+            out += events
+            if not events or len(out) >= (page or {}).get("total", 0):
+                break
+        return out
 
     async def m3u_accounts(self) -> list[dict]:
         return self._results(await self.get("/api/m3u/accounts/"))

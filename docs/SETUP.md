@@ -141,8 +141,8 @@ The image is `ghcr.io/jcarrnah/clipstream-server:latest`. The server listens on 
 | `SONARR_URL` / `SONARR_API_KEY` | Calendar | Sonarr's address and API key (Sonarr → Settings → General) |
 | `RADARR_URL` / `RADARR_API_KEY` | Calendar | Radarr's address and API key (Radarr → Settings → General) |
 | `SEERR_URL` / `SEERR_API_KEY` | Requests | Jellyseerr's (or Seerr's) address and API key (Settings → General). The server makes requests as each signed-in Jellyfin user, so Jellyseerr's own permissions and auto-approval apply; a user who never opened Jellyseerr is imported on first use. |
-| `CHANNEL_REFRESH_SECONDS` | optional | How often the channel list is re-read. Default `300`. |
-| `GUIDE_REFRESH_SECONDS` / `GUIDE_HOURS_AHEAD` | optional | Guide refresh (default `900` s) and how far ahead it reaches (default `24` h) |
+| `CHANNEL_REFRESH_SECONDS` | optional | How often the channel list is re-read. Default `120`. |
+| `GUIDE_REFRESH_SECONDS` / `GUIDE_HOURS_AHEAD` | optional | Guide refresh (default `300` s) and how far ahead it reaches (default `24` h) |
 
 Live TV turns on when the three `DISPATCHARR_*` login settings are present; the calendar when at least one of Sonarr or
 Radarr has both an address and a key; requests when both `SEERR_*` are set. Leave out what you don't use.
