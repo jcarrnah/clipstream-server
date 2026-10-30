@@ -17,6 +17,11 @@ class Settings:
     dispatcharr_url: str | None = field(default_factory=lambda: _env("DISPATCHARR_URL"))
     dispatcharr_public_url: str | None = field(default_factory=lambda: _env("DISPATCHARR_PUBLIC_URL") or _env("DISPATCHARR_URL"))
     dispatcharr_username: str | None = field(default_factory=lambda: _env("DISPATCHARR_USERNAME"))
+    # Signed stream links (app/streams.py): this server's address for players, on a DNS-only hostname (not through
+    # Cloudflare), e.g. https://live.example.com. Unset: players get Dispatcharr's own links as before.
+    stream_public_url: str | None = field(default_factory=lambda: _env("STREAM_PUBLIC_URL"))
+    # Optional; by default the signing key comes from DISPATCHARR_PASSWORD.
+    stream_secret: str | None = field(default_factory=lambda: os.environ.get("STREAM_SECRET"))
     dispatcharr_password: str | None = field(default_factory=lambda: os.environ.get("DISPATCHARR_PASSWORD"))
     # Channel upkeep after each refresh (app/lineup.py): backup streams from the other IPTV accounts, duplicates
     # hidden, pinned channel numbers kept in order. This changes channels, so the Dispatcharr user needs the Admin

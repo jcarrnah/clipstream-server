@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__, categories
@@ -19,6 +19,7 @@ from .config import settings
 from .dispatcharr import Dispatcharr
 from .livetv import LiveTv
 from .stalls import Stalls
+from . import streams
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("clipstream")
@@ -27,6 +28,8 @@ log = logging.getLogger("clipstream")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.jellyfin = httpx.AsyncClient(base_url=settings.jellyfin_url, timeout=20)
+    # Live TV relay (signed links): a long read timeout, since a stream can pause while Dispatcharr fails over.
+    app.state.relay = httpx.AsyncClient(timeout=httpx.Timeout(10, read=60), limits=httpx.Limits(max_connections=200))
     app.state.livetv = None
     app.state.stalls = None
     app.state.calendar = Calendar(settings) if settings.calendar_enabled else None
@@ -51,6 +54,7 @@ async def lifespan(app: FastAPI):
         await app.state.livetv.stop()
     if dispatcharr:
         await dispatcharr.close()
+    await app.state.relay.aclose()
     await app.state.jellyfin.aclose()
 
 
@@ -136,6 +140,17 @@ async def livetv_stalls(limit: int = Query(default=50, ge=1, le=500), user: dict
     """Recent stalls, newest first, each with Dispatcharr's events for that channel around it."""
     _livetv()
     return await app.state.stalls.recent(limit)
+
+
+@app.get("/api/livetv/stream/{uuid}")
+async def livetv_stream(uuid: str, request: Request, exp: str | None = None, sig: str | None = None):
+    """A channel's stream, for links handed out in the channel list. The signature stands in for the Jellyfin sign-in
+    (players can't send headers), and it expires."""
+    _livetv()
+    secret = streams.secret_from(settings.dispatcharr_password, settings.stream_secret)
+    if not settings.stream_public_url or not streams.valid(secret, uuid, exp, sig):
+        raise HTTPException(403, "This Live TV link has expired; reopen the channel")
+    return await streams.relay(request, app.state.relay, settings.dispatcharr_url, uuid)
 
 
 @app.get("/api/livetv/logo/{logo_id}")

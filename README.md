@@ -53,7 +53,8 @@ in News & TV. Each category can list favorite `teams`. To customize, copy the li
 Dispatcharr quirks found along the way:
 - One auto-sync rule per provider group, so this service does the multi-category mapping.
 - Several rules feeding one group need "next available" numbering; fixed ranges leave channels unnumbered.
-- `/proxy/ts/stream/<uuid>` plays without authentication. Channel UUIDs are effectively secrets.
+- `/proxy/ts/stream/<uuid>` plays without authentication. With `STREAM_PUBLIC_URL` set, apps get signed, expiring
+  links to this server, which relays the stream (`app/streams.py`), and `/proxy/` can be closed to the internet.
 
 ## Development
 

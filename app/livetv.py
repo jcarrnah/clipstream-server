@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from . import events, guides, names
+from . import events, guides, names, streams
 from .lineup import Lineup
 from .categories import Category
 from .config import Settings
@@ -108,6 +108,13 @@ class LiveTv:
         upcoming = next((p for p in plist if p["start_time"] > iso), None)
         return self._program(current), self._program(upcoming)
 
+    def stream_url(self, uuid: str) -> str:
+        """A signed link to this server's relay when STREAM_PUBLIC_URL is set, else Dispatcharr's own link."""
+        if self.settings.stream_public_url:
+            secret = streams.secret_from(self.settings.dispatcharr_password, self.settings.stream_secret)
+            return streams.signed_url(self.settings.stream_public_url, secret, uuid)
+        return self.dispatcharr.stream_url(self.settings.dispatcharr_public_url, uuid)
+
     def channel_view(self, channel: dict, now: datetime) -> dict | None:
         """The app's view of one channel, or None for an event that has already ended."""
         name = channel.get("effective_name") or channel.get("name") or ""
@@ -135,7 +142,7 @@ class LiveTv:
             "categories": [c.id for c in cats],
             "featured": any(c.featured(title) for c in cats),
             "logo": f"/api/livetv/logo/{logo_id}" if logo_id else None,
-            "stream": self.dispatcharr.stream_url(self.settings.dispatcharr_public_url, channel["uuid"]),
+            "stream": self.stream_url(channel["uuid"]),
             "event": event.as_dict() if event else None,
             "now": current,
             "next": upcoming,

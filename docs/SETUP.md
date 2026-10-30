@@ -91,8 +91,17 @@ TVs play streams from Dispatcharr directly, so Dispatcharr must be reachable whe
 If your domain is on Cloudflare, set that one host to **DNS only** (grey cloud). Cloudflare's proxy isn't meant for
 streaming video and tends to stall or block it.
 
-Dispatcharr's stream links (`/proxy/ts/stream/<id>`) play without a password; the long channel id is what keeps them
-private. Don't publish your channel list.
+Dispatcharr's stream links (`/proxy/ts/stream/<id>`) play without a password, for anyone who has one, forever. To
+close that, use **signed links** instead:
+
+1. Give this server a DNS-only HTTPS address of its own (for example `https://live.example.com`, grey cloud on
+   Cloudflare), pointing at the server's host port, and set `STREAM_PUBLIC_URL` to it.
+2. Channel lists then hand out links to this server, signed and good for 12 hours; the server checks the signature and
+   relays the stream from Dispatcharr over your LAN (a few milliseconds; the stream takes the same route as before).
+3. Block `/proxy/` on Dispatcharr's public address (its admin pages can stay), so old links stop working. Keep the LAN
+   address open: anything at home that plays from Dispatcharr directly (Jellyfin's own Live TV tuner) uses that.
+
+No app update is needed: the apps play whatever link the channel list gives them.
 
 ### 2.6 Channel upkeep: backup streams, duplicates, numbers (optional)
 
@@ -135,6 +144,8 @@ The image is `ghcr.io/jcarrnah/clipstream-server:latest`. The server listens on 
 | `DISPATCHARR_URL` | Live TV | Dispatcharr as the container can reach it, e.g. `http://192.168.1.10:9191` |
 | `DISPATCHARR_PUBLIC_URL` | Live TV | The address TVs use to play streams (step 2.5). Defaults to `DISPATCHARR_URL`. |
 | `DISPATCHARR_USERNAME` / `DISPATCHARR_PASSWORD` | Live TV | The user from step 2.4 |
+| `STREAM_PUBLIC_URL` | optional | Signed stream links through this server (step 2.5), e.g. `https://live.example.com`. Unset: Dispatcharr's own links. |
+| `STREAM_SECRET` | optional | Key for signing those links. Default: derived from `DISPATCHARR_PASSWORD` (changing that password ends old links). |
 | `DISPATCHARR_MANAGE_CHANNELS` | optional | `true` for backup streams from your other IPTV sources, hidden duplicates and kept channel numbers (step 2.6). Off by default. |
 | `LOCAL_TIMEZONE` | Live TV | Your time zone, e.g. `America/Chicago`. Event times without a zone ("7pm Cubs at Reds") are read in it. Default `America/New_York`. |
 | `CATEGORIES_FILE` | Live TV | Path (inside the container) to your categories file, see step 7 |
