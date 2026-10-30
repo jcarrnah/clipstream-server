@@ -17,7 +17,6 @@ from fastapi.responses import StreamingResponse
 log = logging.getLogger("clipstream.streams")
 
 LINK_HOURS = 12
-CHUNK = 64 * 1024
 
 
 def secret_from(password: str | None, explicit: str | None = None) -> bytes:
@@ -64,7 +63,8 @@ async def relay(request: Request, client: httpx.AsyncClient, dispatcharr_url: st
 
     async def body():
         try:
-            async for chunk in upstream.aiter_raw(CHUNK):
+            # As it arrives: a chunk size would hold data back until that much had come in.
+            async for chunk in upstream.aiter_raw():
                 yield chunk
         finally:
             await upstream.aclose()
