@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from . import events, guides, names, streams
+from . import events, guides, names, scores, streams
 from .lineup import Lineup
 from .categories import Category
 from .config import Settings
@@ -35,10 +35,13 @@ class LiveTv:
         self._tasks: list[asyncio.Task] = []
         self.lineup = Lineup(dispatcharr) if settings.dispatcharr_manage_channels else None
         self._lineup_task: asyncio.Task | None = None
+        self.scoreboard = scores.Scoreboard(settings.local_timezone) if settings.scoreboard else None
 
     # region refresh
 
     async def start(self):
+        if self.scoreboard:
+            self.scoreboard.start()
         await asyncio.gather(self.refresh_channels(), self.refresh_guide(), return_exceptions=True)
         self._tasks = [
             asyncio.create_task(self._every(self.settings.channel_refresh_seconds, self.refresh_channels)),
@@ -46,6 +49,8 @@ class LiveTv:
         ]
 
     async def stop(self):
+        if self.scoreboard:
+            await self.scoreboard.stop()
         for t in self._tasks + ([self._lineup_task] if self._lineup_task else []):
             t.cancel()
 
@@ -116,7 +121,7 @@ class LiveTv:
         return self.dispatcharr.stream_url(self.settings.dispatcharr_public_url, uuid)
 
     def channel_view(self, channel: dict, now: datetime) -> dict | None:
-        """The app's view of one channel, or None for an event that has already ended."""
+        """The app's view of one channel, or None for an event slot with nothing to watch now (app/scores.py)."""
         name = channel.get("effective_name") or channel.get("name") or ""
         group = self.groups.get(channel.get("effective_channel_group_id") or channel.get("channel_group_id"))
         event = events.parse(name, now, self.settings.local_timezone) if events.looks_like_event(name) else None
@@ -126,8 +131,11 @@ class LiveTv:
             # "8:00 pm" with no date could be a stale slot from weeks ago; only trust it when the guide agrees.
             # League package slots (NFL/NHL/...) are rewritten daily, so their clock times are today's.
             event.status = "unknown"
-        if event and event.status == "ended":
-            return None
+        if event:
+            match = self.scoreboard.find(name, event.title, event.start, now) if self.scoreboard else scores.Match()
+            pre, post = (timedelta(minutes=m) for m in (self.settings.event_pregame_minutes, self.settings.event_postgame_minutes))
+            if not scores.apply(event, match, now, pre, post):
+                return None  # not on yet, over, or a leftover slot: the provider's "starting soon" picture
         cats = [c for c in self.categories if c.matches(group, name)]
         title = names.tidy(event.title if event else events.clean_title(name))
         if event:

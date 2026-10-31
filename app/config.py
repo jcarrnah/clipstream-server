@@ -46,6 +46,12 @@ class Settings:
     # Optional JSON file overriding the built-in category rules (see app/categories.py).
     categories_file: str | None = field(default_factory=lambda: _env("CATEGORIES_FILE"))
 
+    # Event slots show from this long before the real start until this long after the final (app/scores.py: ESPN's
+    # scoreboards for the major leagues; others use the provider's times). SCOREBOARD=false uses provider times only.
+    event_pregame_minutes: int = field(default_factory=lambda: int(_env("EVENT_PREGAME_MINUTES", "30")))
+    event_postgame_minutes: int = field(default_factory=lambda: int(_env("EVENT_POSTGAME_MINUTES", "30")))
+    scoreboard: bool = field(default_factory=lambda: (_env("SCOREBOARD") or "true").lower() not in ("0", "false", "no"))
+
     channel_refresh_seconds: int = field(default_factory=lambda: int(_env("CHANNEL_REFRESH_SECONDS", "120")))
     guide_refresh_seconds: int = field(default_factory=lambda: int(_env("GUIDE_REFRESH_SECONDS", "300")))
     guide_hours_ahead: int = field(default_factory=lambda: int(_env("GUIDE_HOURS_AHEAD", "24")))

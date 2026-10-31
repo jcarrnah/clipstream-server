@@ -147,6 +147,7 @@ The image is `ghcr.io/jcarrnah/clipstream-server:latest`. The server listens on 
 | `STREAM_PUBLIC_URL` | optional | Signed stream links through this server (step 2.5), e.g. `https://live.example.com`. Unset: Dispatcharr's own links. |
 | `STREAM_SECRET` | optional | Key for signing those links. Default: derived from `DISPATCHARR_PASSWORD` (changing that password ends old links). |
 | `DISPATCHARR_MANAGE_CHANNELS` | optional | `true` for backup streams from your other IPTV sources, hidden duplicates and kept channel numbers (step 2.6). Off by default. |
+| `EVENT_PREGAME_MINUTES` / `EVENT_POSTGAME_MINUTES` | optional | Game slots show from this long before the real start (ESPN's schedule for NFL, NBA, NHL, MLB, WNBA, college football/basketball, major soccer) until this long after the final, so "starting soon" pictures and leftover slots stay out of the list. Default 30 / 30. Other events use the provider's times. `SCOREBOARD=false` turns the schedule check off. |
 | `LOCAL_TIMEZONE` | Live TV | Your time zone, e.g. `America/Chicago`. Event times without a zone ("7pm Cubs at Reds") are read in it. Default `America/New_York`. |
 | `CATEGORIES_FILE` | Live TV | Path (inside the container) to your categories file, see step 7 |
 | `SONARR_URL` / `SONARR_API_KEY` | Calendar | Sonarr's address and API key (Sonarr → Settings → General) |
