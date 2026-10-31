@@ -101,9 +101,27 @@ def discord_payload(report: dict, mention: str | None, link: str | None) -> dict
     return {"content": mention or None, "embeds": [embed], "allowed_mentions": {"parse": ["users", "roles"]}}
 
 
+def webhook_url(value: str | None) -> str | None:
+    """The webhook as pasted into a container setting: quotes, a missing https:// or just "<id>/<token>" are all
+    taken; anything else is refused with a log line saying what's wrong."""
+    v = (value or "").strip().strip("'\"").strip()
+    if not v:
+        return None
+    if not v.startswith(("http://", "https://")):
+        if v.startswith(("discord.com/", "discordapp.com/", "ptb.discord.com/", "canary.discord.com/")):
+            v = "https://" + v
+        elif v.count("/") == 1 and v.split("/")[0].isdigit():
+            v = "https://discord.com/api/webhooks/" + v
+        else:
+            log.warning("DISCORD_REPORT_WEBHOOK isn't a webhook URL (it should look like "
+                        "https://discord.com/api/webhooks/<id>/<token>); reports won't reach Discord")
+            return None
+    return v
+
+
 class Reports:
     def __init__(self, webhook: str | None, mention: str | None, public_url: str | None, path: str | None):
-        self.webhook = webhook
+        self.webhook = webhook_url(webhook)
         self.mention = mention
         self.public_url = public_url
         self.path = Path(path) if path else None
