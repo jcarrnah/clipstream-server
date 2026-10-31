@@ -62,9 +62,11 @@ def test_posts_to_the_webhook_and_keeps_a_file(tmp_path):
 def test_webhook_url_forgives_pasting():
     from app.reports import webhook_url
     full = "https://discord.com/api/webhooks/123/abc"
+    assert webhook_url("​" + full) == full
+    assert webhook_url("﻿https://discord.com/api/webhooks/123/abc") == full
     assert webhook_url(full) == full
     assert webhook_url(f'"{full}"') == full
     assert webhook_url(" discord.com/api/webhooks/123/abc ") == full
-    assert webhook_url("123/abc") == full
+    assert webhook_url("1565930024287342632/" + "x" * 30) == "https://discord.com/api/webhooks/1565930024287342632/" + "x" * 30
     assert webhook_url("abc") is None
     assert webhook_url("") is None

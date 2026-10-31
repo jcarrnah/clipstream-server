@@ -4,6 +4,7 @@ server's owner hears about them. GET /api/reports lists them for admins."""
 from __future__ import annotations
 
 import json
+import re
 import logging
 import time
 import uuid
@@ -101,22 +102,32 @@ def discord_payload(report: dict, mention: str | None, link: str | None) -> dict
     return {"content": mention or None, "embeds": [embed], "allowed_mentions": {"parse": ["users", "roles"]}}
 
 
+_WEBHOOK = re.compile(r"((?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+)")
+
+
 def webhook_url(value: str | None) -> str | None:
-    """The webhook as pasted into a container setting: quotes, a missing https:// or just "<id>/<token>" are all
-    taken; anything else is refused with a log line saying what's wrong."""
-    v = (value or "").strip().strip("'\"").strip()
+    """The webhook as pasted into a container setting. Its address is found anywhere in the value, so quotes, a
+    missing https://, invisible characters copied along with it (seen on Unraid) or just "<id>/<token>" all work;
+    anything else is refused with a log line saying so."""
+    v = (value or "").strip()
     if not v:
         return None
-    if not v.startswith(("http://", "https://")):
-        if v.startswith(("discord.com/", "discordapp.com/", "ptb.discord.com/", "canary.discord.com/")):
-            v = "https://" + v
-        elif v.count("/") == 1 and v.split("/")[0].isdigit():
-            v = "https://discord.com/api/webhooks/" + v
-        else:
-            log.warning("DISCORD_REPORT_WEBHOOK isn't a webhook URL (it should look like "
-                        "https://discord.com/api/webhooks/<id>/<token>); reports won't reach Discord")
-            return None
-    return v
+    m = _WEBHOOK.search(v)
+    if m:
+        url = "https://" + m.group(1)
+    elif (other := re.search(r"https?://\S+", v)):
+        url = other.group(0)  # another service that takes Discord's format
+    else:
+        bare = re.search(r"(\d{5,})/([\w-]{20,})", v)
+        url = f"https://discord.com/api/webhooks/{bare.group(1)}/{bare.group(2)}" if bare else None
+    if not url:
+        log.warning("DISCORD_REPORT_WEBHOOK isn't a webhook URL (it should look like "
+                    "https://discord.com/api/webhooks/<id>/<token>); reports won't reach Discord")
+        return None
+    if not v.startswith(url):
+        log.info("DISCORD_REPORT_WEBHOOK had %d extra character(s) around the address; using the address", len(v) - len(url))
+    log.info("Reports go to a Discord webhook (%s/…)", url.rsplit("/", 1)[0])
+    return url
 
 
 class Reports:
