@@ -130,10 +130,17 @@ def webhook_url(value: str | None) -> str | None:
     return url
 
 
+def mention_text(value: str | None) -> str | None:
+    """Who to ping: a user id, "@<id>" or "<@id>" become Discord's <@id>; roles (<@&id>) and anything else as given."""
+    v = (value or "").strip().strip("'\"").strip()
+    m = re.fullmatch(r"<?@?!?(\d{5,})>?", v)
+    return f"<@{m.group(1)}>" if m else (v or None)
+
+
 class Reports:
     def __init__(self, webhook: str | None, mention: str | None, public_url: str | None, path: str | None):
         self.webhook = webhook_url(webhook)
-        self.mention = mention
+        self.mention = mention_text(mention)
         self.public_url = public_url
         self.path = Path(path) if path else None
         self.items: deque[dict] = deque(maxlen=KEEP)

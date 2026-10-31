@@ -70,3 +70,11 @@ def test_webhook_url_forgives_pasting():
     assert webhook_url("1565930024287342632/" + "x" * 30) == "https://discord.com/api/webhooks/1565930024287342632/" + "x" * 30
     assert webhook_url("abc") is None
     assert webhook_url("") is None
+
+
+def test_mention_forms():
+    from app.reports import mention_text
+    for v in ("575698426986233870", "@575698426986233870", "<@575698426986233870>", " <@!575698426986233870> "):
+        assert mention_text(v) == "<@575698426986233870>"
+    assert mention_text("<@&123456789>") == "<@&123456789>"
+    assert mention_text("") is None
