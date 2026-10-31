@@ -130,8 +130,10 @@ async def livetv_guide(
 @app.post("/api/livetv/stalls")
 async def livetv_stall(report: dict = Body(...), user: dict = Depends(current_user)):
     """The app reports a Live TV stall: buffering mid-stream (how long), or a stream that failed."""
-    _livetv()
-    app.state.stalls.add(report, user)
+    livetv = _livetv()
+    channel = next((c for c in livetv.channels if c.get("id") == report.get("channelId")), None)
+    provider_name = (channel.get("effective_name") or channel.get("name")) if channel else None
+    app.state.stalls.add(report, user, provider_name)
     return {"ok": True}
 
 

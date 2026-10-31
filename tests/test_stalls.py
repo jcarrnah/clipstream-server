@@ -23,5 +23,11 @@ def test_matches_the_channels_events_around_the_stall():
     assert "duration" not in got[1]
 
 
+def test_matches_by_the_provider_name_when_known():
+    stall = {"startedAt": "2026-10-25T21:26:47.5Z", "seconds": 4.2, "channel": "Sky Sports F1",
+             "providerName": "F1| SKY SPORTS F1 FHD"}
+    assert len(matching(stall, EVENTS)) == 2
+
+
 def test_bad_time_matches_nothing():
     assert matching({"startedAt": "soon", "seconds": 1, "channel": "F1| SKY SPORTS F1 FHD"}, EVENTS) == []

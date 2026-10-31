@@ -36,7 +36,8 @@ def matching(stall: dict, events: list[dict]) -> list[dict]:
     if start is None:
         return []
     end = start + timedelta(seconds=stall.get("seconds") or 0)
-    name = " ".join((stall.get("channel") or "").upper().split())
+    # Dispatcharr logs the provider's channel name; the apps send the tidied one shown to viewers.
+    name = " ".join((stall.get("providerName") or stall.get("channel") or "").upper().split())
     out = []
     for e in events:
         at = _parse(e.get("timestamp", ""))
@@ -51,13 +52,14 @@ class Stalls:
         self.dispatcharr = dispatcharr
         self.items: deque[dict] = deque(maxlen=KEEP)
 
-    def add(self, report: dict, user: dict) -> dict:
+    def add(self, report: dict, user: dict, provider_name: str | None = None) -> dict:
         stall = {
             "startedAt": str(report.get("startedAt") or datetime.now(timezone.utc).isoformat()),
             "seconds": round(float(report.get("seconds") or 0), 1),
             "kind": str(report.get("kind") or "buffering")[:20],
             "channel": str(report.get("channel") or "")[:200],
             "channelId": report.get("channelId"),
+            "providerName": provider_name,
             "ended": bool(report.get("ended", True)),
             "detail": str(report.get("detail") or "")[:300] or None,
             "video": str(report.get("video") or "")[:100] or None,
