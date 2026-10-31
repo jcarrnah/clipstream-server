@@ -152,6 +152,10 @@ The image is `ghcr.io/jcarrnah/clipstream-server:latest`. The server listens on 
 | `CATEGORIES_FILE` | Live TV | Path (inside the container) to your categories file, see step 7 |
 | `SONARR_URL` / `SONARR_API_KEY` | Calendar | Sonarr's address and API key (Sonarr → Settings → General) |
 | `RADARR_URL` / `RADARR_API_KEY` | Calendar | Radarr's address and API key (Radarr → Settings → General) |
+| `DISCORD_REPORT_WEBHOOK` | Reports | A Discord channel webhook (channel → Edit → Integrations → Webhooks → New, Copy URL). Viewers' "report a problem" messages are posted there. Without it reports are only kept and logged (`GET /api/reports`, admins). |
+| `DISCORD_REPORT_MENTION` | optional | Who to ping with each report, e.g. `<@123456789012345678>` (Discord: Developer Mode on, right-click yourself → Copy User ID). |
+| `JELLYFIN_PUBLIC_URL` | optional | Jellyfin's public address, so a report links to the item, e.g. `https://watch.example.com`. |
+| `REPORTS_FILE` | optional | Keep reports across restarts, e.g. `/data/reports.jsonl` on a mapped volume. |
 | `SEERR_URL` / `SEERR_API_KEY` | Requests | Jellyseerr's (or Seerr's) address and API key (Settings → General). The server makes requests as each signed-in Jellyfin user, so Jellyseerr's own permissions and auto-approval apply; a user who never opened Jellyseerr is imported on first use. |
 | `CHANNEL_REFRESH_SECONDS` | optional | How often the channel list is re-read. Default `120`. |
 | `GUIDE_REFRESH_SECONDS` / `GUIDE_HOURS_AHEAD` | optional | Guide refresh (default `300` s) and how far ahead it reaches (default `24` h) |

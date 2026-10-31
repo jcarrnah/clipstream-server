@@ -40,6 +40,14 @@ class Settings:
     seerr_url: str | None = field(default_factory=lambda: _env("SEERR_URL") or _env("JELLYSEERR_URL"))
     seerr_api_key: str | None = field(default_factory=lambda: _env("SEERR_API_KEY") or _env("JELLYSEERR_API_KEY"))
 
+    # Problem reports from the apps (app/reports.py): a Discord webhook to post them to, who to ping there (e.g.
+    # "<@123456789012345678>"), Jellyfin's public address for links, and an optional file that keeps them across
+    # restarts (on a mapped volume).
+    discord_report_webhook: str | None = field(default_factory=lambda: _env("DISCORD_REPORT_WEBHOOK"))
+    discord_report_mention: str | None = field(default_factory=lambda: _env("DISCORD_REPORT_MENTION"))
+    jellyfin_public_url: str | None = field(default_factory=lambda: _env("JELLYFIN_PUBLIC_URL"))
+    reports_file: str | None = field(default_factory=lambda: _env("REPORTS_FILE"))
+
     # Where listings without an explicit zone (e.g. "7pm Devils at Rangers") are assumed to be.
     local_timezone: str = field(default_factory=lambda: _env("LOCAL_TIMEZONE", "America/New_York"))
 

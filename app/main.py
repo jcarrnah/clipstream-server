@@ -19,6 +19,8 @@ from .config import settings
 from .dispatcharr import Dispatcharr
 from .livetv import LiveTv
 from .stalls import Stalls
+from .reports import Reports
+from .auth import _token
 from . import streams
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -37,6 +39,8 @@ async def lifespan(app: FastAPI):
     if app.state.upgrades:
         app.state.upgrades.start()
     app.state.seerr = Seerr(settings) if settings.requests_enabled else None
+    app.state.reports = Reports(settings.discord_report_webhook, settings.discord_report_mention,
+                                settings.jellyfin_public_url, settings.reports_file)
     dispatcharr = None
     if settings.livetv_enabled:
         dispatcharr = Dispatcharr(settings.dispatcharr_url, settings.dispatcharr_username, settings.dispatcharr_password)
@@ -54,6 +58,7 @@ async def lifespan(app: FastAPI):
         await app.state.livetv.stop()
     if dispatcharr:
         await dispatcharr.close()
+    await app.state.reports.close()
     await app.state.relay.aclose()
     await app.state.jellyfin.aclose()
 
@@ -94,7 +99,7 @@ async def health():
     return {
         "name": "clipstream-server", "version": __version__,
         "features": {"livetv": lt is not None, "calendar": cal is not None, "upgrades": app.state.upgrades is not None,
-                     "requests": app.state.seerr is not None},
+                     "requests": app.state.seerr is not None, "reports": True},
         "livetv": {"channels": len(lt.channels), "channelsAt": lt.channels_at, "guideAt": lt.guide_at,
                    "lineup": lt.lineup.status if lt.lineup else None} if lt else None,
         "calendar": cal.status if cal else None,
@@ -142,6 +147,33 @@ async def livetv_stalls(limit: int = Query(default=50, ge=1, le=500), user: dict
     """Recent stalls, newest first, each with Dispatcharr's events for that channel around it."""
     _livetv()
     return await app.state.stalls.recent(limit)
+
+
+@app.post("/api/reports")
+async def report_problem(request: Request, body: dict = Body(...), user: dict = Depends(current_user)):
+    """A viewer reports a problem with an item, in their own words (body: itemId, kind, message, positionSeconds, app,
+    device, playback). The item's file facts are looked up with the viewer's own sign-in."""
+    reports: Reports = app.state.reports
+    if not reports.allowed(user.get("id") or user.get("name") or "?"):
+        raise HTTPException(429, "That's a lot of reports in an hour: try again later")
+    item = None
+    item_id = str(body.get("itemId") or "")
+    token = _token(request.headers.get("authorization"), request.headers.get("x-emby-token"), None)
+    if item_id.replace("-", "").isalnum() and token and user.get("id"):
+        r = await app.state.jellyfin.get(f"/Users/{user['id']}/Items/{item_id}",
+                                         headers={"Authorization": f'MediaBrowser Token="{token}"'})
+        if r.is_success:
+            item = r.json()
+    report = await reports.add(reports.build(body, user, item))
+    return {"ok": True, "id": report["id"], "notified": report.get("notified", False)}
+
+
+@app.get("/api/reports")
+async def list_reports(limit: int = Query(default=50, ge=1, le=500), user: dict = Depends(current_user)):
+    """Recent problem reports, newest first (admins only)."""
+    if not user.get("admin"):
+        raise HTTPException(403, "Only admins can read reports")
+    return app.state.reports.recent(limit)
 
 
 @app.get("/api/livetv/stream/{uuid}")
