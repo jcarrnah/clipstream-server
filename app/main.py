@@ -18,7 +18,7 @@ from .upgrades import Upgrades
 from .config import settings
 from .dispatcharr import Dispatcharr
 from .livetv import LiveTv
-from .stalls import Stalls
+from .stalls import PlaybackStalls, Stalls
 from .reports import Reports
 from .auth import _token
 from . import streams
@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     app.state.relay = httpx.AsyncClient(timeout=httpx.Timeout(10, read=60), limits=httpx.Limits(max_connections=200))
     app.state.livetv = None
     app.state.stalls = None
+    app.state.playback_stalls = PlaybackStalls()
     app.state.calendar = Calendar(settings) if settings.calendar_enabled else None
     app.state.upgrades = Upgrades(settings) if settings.calendar_enabled else None
     if app.state.upgrades:
@@ -99,7 +100,8 @@ async def health():
     return {
         "name": "clipstream-server", "version": __version__,
         "features": {"livetv": lt is not None, "calendar": cal is not None, "upgrades": app.state.upgrades is not None,
-                     "requests": app.state.seerr is not None, "reports": True},
+                     "requests": app.state.seerr is not None, "reports": True,
+                     "playbackStalls": True},
         "livetv": {"channels": len(lt.channels), "channelsAt": lt.channels_at, "guideAt": lt.guide_at,
                    "lineup": lt.lineup.status if lt.lineup else None} if lt else None,
         "calendar": cal.status if cal else None,
@@ -174,6 +176,23 @@ async def list_reports(limit: int = Query(default=50, ge=1, le=500), user: dict 
     if not user.get("admin"):
         raise HTTPException(403, "Only admins can read reports")
     return app.state.reports.recent(limit)
+
+
+@app.post("/api/playback/stalls")
+async def playback_stall(report: dict = Body(...), user: dict = Depends(current_user)):
+    """The app reports a movie or episode that sat buffering (kind "buffering", after it had started) or never started
+    (kind "start"): how long, where, how it was playing (playMethod, quality, bitrate), and whether the viewer was
+    offered a lower quality."""
+    app.state.playback_stalls.add(report, user)
+    return {"ok": True}
+
+
+@app.get("/api/playback/stalls")
+async def playback_stalls(limit: int = Query(default=50, ge=1, le=500), user: dict = Depends(current_user)):
+    """Recent playback stalls, newest first (admins only: they name viewers and what they watched)."""
+    if not user.get("admin"):
+        raise HTTPException(403, "Only admins can read playback stalls")
+    return app.state.playback_stalls.recent(limit)
 
 
 @app.get("/api/livetv/stream/{uuid}")

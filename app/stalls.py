@@ -81,3 +81,50 @@ class Stalls:
             log.exception("couldn't read Dispatcharr's events")
             events = []
         return [{**s, "dispatcharr": matching(s, events)} for s in stalls]
+
+
+class PlaybackStalls:
+    """Movies and episodes that sat buffering (or never started) for a while, reported by the apps:
+    GET /api/playback/stalls. Kept in memory and logged, like Live TV stalls. A viewer whose stalls cluster on big files
+    usually has a connection that can't keep up (the apps offer a lower quality after a long wait)."""
+
+    def __init__(self) -> None:
+        self.items: deque[dict] = deque(maxlen=KEEP)
+
+    def add(self, report: dict, user: dict) -> dict:
+        def text(key: str, limit: int) -> str | None:
+            return str(report.get(key) or "")[:limit] or None
+
+        def number(key: str) -> float | None:
+            try:
+                return round(float(report[key]), 1) if report.get(key) is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        stall = {
+            "startedAt": str(report.get("startedAt") or datetime.now(timezone.utc).isoformat()),
+            "seconds": number("seconds") or 0.0,
+            # buffering: after it had started playing; start: it never started.
+            "kind": str(report.get("kind") or "buffering")[:20],
+            "ended": bool(report.get("ended", True)),
+            "itemId": text("itemId", 64),
+            "title": text("title", 200),
+            "positionSeconds": number("positionSeconds"),
+            "playMethod": text("playMethod", 30),
+            "quality": text("quality", 30),
+            "bitrate": int(report["bitrate"]) if str(report.get("bitrate") or "").isdigit() else None,
+            "hinted": bool(report.get("hinted", False)),
+            "detail": text("detail", 300),
+            "app": text("app", 60),
+            "device": text("device", 100),
+            "user": user.get("name"),
+        }
+        self.items.append(stall)
+        mbps = f" {stall['bitrate'] / 1e6:.1f} Mbps" if stall["bitrate"] else ""
+        log.info("playback stall: %s %ss%s on %s at %ss (%s, %s %s, %s%s)", stall["kind"], stall["seconds"],
+                 "" if stall["ended"] else " (left)", stall["title"], stall["positionSeconds"], stall["user"],
+                 stall["app"], stall["device"], stall["playMethod"], mbps)
+        return stall
+
+    def recent(self, limit: int) -> list[dict]:
+        return list(self.items)[-limit:][::-1]

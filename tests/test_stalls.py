@@ -31,3 +31,16 @@ def test_matches_by_the_provider_name_when_known():
 
 def test_bad_time_matches_nothing():
     assert matching({"startedAt": "soon", "seconds": 1, "channel": "F1| SKY SPORTS F1 FHD"}, EVENTS) == []
+
+
+def test_playback_stalls_keep_newest_first_and_clean_fields():
+    from app.stalls import PlaybackStalls
+    stalls = PlaybackStalls()
+    stalls.add({"seconds": "18.24", "kind": "buffering", "title": "Resident Evil", "positionSeconds": 2,
+                "bitrate": 8568000, "playMethod": "Transcode", "hinted": True}, {"name": "viewer"})
+    stalls.add({"seconds": "nope", "kind": "start", "bitrate": "fast", "title": "x" * 500}, {"name": "viewer"})
+    newest, oldest = stalls.recent(10)
+    assert newest["kind"] == "start" and newest["seconds"] == 0.0 and newest["bitrate"] is None
+    assert len(newest["title"]) == 200
+    assert oldest["seconds"] == 18.2 and oldest["bitrate"] == 8568000 and oldest["hinted"] is True
+    assert oldest["user"] == "viewer" and oldest["ended"] is True
