@@ -455,7 +455,9 @@ class Wrapped:
         self.tz = ZoneInfo(tz)
         self.opens = opens
         self.preview_all = preview_all
-        self._cache: tuple[float, int, dict] | None = None
+        # (when, year, the history sync it was made from, data): a sync since then (above all the first one, which
+        # copies the whole log) makes it stale, or the first viewer to look would cache an empty year.
+        self._cache: tuple[float, int, str | None, dict] | None = None
         self._lock = asyncio.Lock()
 
     def window(self, now: datetime) -> tuple[date, date]:
@@ -481,10 +483,12 @@ class Wrapped:
 
     async def _data(self, year: int) -> dict:
         async with self._lock:
-            if self._cache and self._cache[1] == year and time.monotonic() - self._cache[0] < CACHE_SECONDS:
-                return self._cache[2]
+            synced = self.history.status.get("syncedAt")
+            c = self._cache
+            if c and c[1] == year and c[2] == synced and time.monotonic() - c[0] < CACHE_SECONDS:
+                return c[3]
             data = await asyncio.to_thread(self.compute, year)
-            self._cache = (time.monotonic(), year, data)
+            self._cache = (time.monotonic(), year, synced, data)
             return data
 
     async def for_user(self, user_id: str, preview: bool = False) -> dict:
