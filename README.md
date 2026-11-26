@@ -40,6 +40,12 @@ header, an `X-Emby-Token` header, or `?api_key=`.
 | `GET /api/requests/discover/{trending,movies,tv,upcoming}`, `GET /api/requests/search?q=` | Titles to request, each with what the library already has |
 | `GET /api/requests/{movie,tv}/{tmdbId}` | One title; a show lists its seasons and each one's state |
 | `POST /api/requests/{movie,tv}/{tmdbId}` | Request it as the caller (`{"seasons": [1, 2]}` for some of a show's seasons) |
+| `GET /api/wrapped` | The caller's year in review: `available`, `year`, `opensAt`, `closesAt`, `seen`, `slides` (or `available: false` with `reason` `not_open` / `not_enough`). Admins: `?preview=true`, `?user=<id>` |
+| `POST /api/wrapped/seen` | `{"year": 2026, "state": "opened" \| "dismissed"}`: the pop-up was answered (on any device) |
+
+Each year-in-review slide has an `id` and any of `kicker`, `value` + `unit` (the big number), `title`, `caption`,
+`items` (`label`, `value`, optional `share` 0-1), `posterId` and `backdropId` (Jellyfin item ids). The server writes
+the words; the apps lay out whatever fields are there.
 
 ## Categories
 

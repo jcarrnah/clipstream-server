@@ -48,6 +48,16 @@ class Settings:
     jellyfin_public_url: str | None = field(default_factory=lambda: _env("JELLYFIN_PUBLIC_URL"))
     reports_file: str | None = field(default_factory=lambda: _env("REPORTS_FILE"))
 
+    # Watch history and the year in review (app/history.py, app/wrapped.py): a Jellyfin API key (Dashboard > API Keys)
+    # to read the activity log and the active sessions, and a database file on a mapped volume (e.g.
+    # /config/history.sqlite) that keeps every play past Jellyfin's own log and file replacements.
+    jellyfin_api_key: str | None = field(default_factory=lambda: os.environ.get("JELLYFIN_API_KEY"))
+    history_db: str | None = field(default_factory=lambda: _env("HISTORY_DB"))
+    # The year in review opens on this day (MM-DD, local time) and closes when the year ends. WRAPPED_PREVIEW=true
+    # opens it for everyone now (testing); admins can always open it with ?preview=true.
+    wrapped_opens: str = field(default_factory=lambda: _env("WRAPPED_OPENS", "12-01"))
+    wrapped_preview: bool = field(default_factory=lambda: (_env("WRAPPED_PREVIEW") or "").lower() in ("1", "true", "yes"))
+
     # Where listings without an explicit zone (e.g. "7pm Devils at Rangers") are assumed to be.
     local_timezone: str = field(default_factory=lambda: _env("LOCAL_TIMEZONE", "America/New_York"))
 
@@ -71,6 +81,10 @@ class Settings:
     @property
     def requests_enabled(self) -> bool:
         return bool(self.seerr_url and self.seerr_api_key)
+
+    @property
+    def history_enabled(self) -> bool:
+        return bool(self.jellyfin_api_key and self.history_db)
 
     @property
     def calendar_enabled(self) -> bool:

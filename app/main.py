@@ -20,6 +20,8 @@ from .dispatcharr import Dispatcharr
 from .livetv import LiveTv
 from .stalls import PlaybackStalls, Stalls
 from .reports import Reports
+from .history import History
+from .wrapped import Wrapped
 from .auth import _token
 from . import streams
 
@@ -42,15 +44,24 @@ async def lifespan(app: FastAPI):
     app.state.seerr = Seerr(settings) if settings.requests_enabled else None
     app.state.reports = Reports(settings.discord_report_webhook, settings.discord_report_mention,
                                 settings.jellyfin_public_url, settings.reports_file)
+    app.state.history = None
+    app.state.wrapped = None
+    if settings.history_enabled:
+        app.state.history = History(settings.history_db, settings.jellyfin_url, settings.jellyfin_api_key)
+        app.state.history.start()
+        app.state.wrapped = Wrapped(app.state.history, settings.local_timezone, settings.wrapped_opens,
+                                    settings.wrapped_preview)
     dispatcharr = None
     if settings.livetv_enabled:
         dispatcharr = Dispatcharr(settings.dispatcharr_url, settings.dispatcharr_username, settings.dispatcharr_password)
         app.state.livetv = LiveTv(settings, dispatcharr, categories.load(settings.categories_file))
         app.state.stalls = Stalls(dispatcharr)
         await app.state.livetv.start()
-    log.info("ready: livetv=%s calendar=%s requests=%s", settings.livetv_enabled, settings.calendar_enabled,
-             settings.requests_enabled)
+    log.info("ready: livetv=%s calendar=%s requests=%s history=%s", settings.livetv_enabled, settings.calendar_enabled,
+             settings.requests_enabled, settings.history_enabled)
     yield
+    if app.state.history:
+        await app.state.history.stop()
     if app.state.upgrades:
         await app.state.upgrades.stop()
     if app.state.seerr:
@@ -101,7 +112,8 @@ async def health():
         "name": "clipstream-server", "version": __version__,
         "features": {"livetv": lt is not None, "calendar": cal is not None, "upgrades": app.state.upgrades is not None,
                      "requests": app.state.seerr is not None, "reports": True,
-                     "playbackStalls": True},
+                     "playbackStalls": True, "wrapped": app.state.wrapped is not None},
+        "history": app.state.history.counts() if app.state.history else None,
         "livetv": {"channels": len(lt.channels), "channelsAt": lt.channels_at, "guideAt": lt.guide_at,
                    "lineup": lt.lineup.status if lt.lineup else None} if lt else None,
         "calendar": cal.status if cal else None,
@@ -193,6 +205,38 @@ async def playback_stalls(limit: int = Query(default=50, ge=1, le=500), user: di
     if not user.get("admin"):
         raise HTTPException(403, "Only admins can read playback stalls")
     return app.state.playback_stalls.recent(limit)
+
+
+def _wrapped() -> Wrapped:
+    if app.state.wrapped is None:
+        raise HTTPException(404, "Watch history isn't set up on this server")
+    return app.state.wrapped
+
+
+@app.get("/api/wrapped")
+async def wrapped(preview: bool = False, user_id: str | None = Query(default=None, alias="user"),
+                  user: dict = Depends(current_user)):
+    """The caller's year in review: {available, year, opensAt, closesAt, seen, updatedAt, slides} (or available false
+    with reason "not_open" / "not_enough"). Admins can open it before it opens (preview=true) and as anyone (user=)."""
+    w = _wrapped()
+    if (preview or user_id) and not user.get("admin"):
+        raise HTTPException(403, "Only admins can preview the year in review")
+    uid = user_id or user.get("id")
+    if not uid:
+        return {"available": False, "reason": "not_enough"}
+    return await w.for_user(uid, preview=preview or bool(user_id))
+
+
+@app.post("/api/wrapped/seen")
+async def wrapped_seen(body: dict = Body(...), user: dict = Depends(current_user)):
+    """The app showed the pop-up: state "opened" (viewed it) or "dismissed" (Not now). Either one stops the pop-up on
+    every device; the review stays reachable from Settings."""
+    w = _wrapped()
+    state = body.get("state")
+    if state not in ("opened", "dismissed") or not user.get("id"):
+        raise HTTPException(400, "state is opened or dismissed")
+    w.history.mark_seen(user["id"], int(body.get("year") or datetime.now().year), state)
+    return {"ok": True}
 
 
 @app.get("/api/livetv/stream/{uuid}")

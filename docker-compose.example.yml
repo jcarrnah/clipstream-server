@@ -7,4 +7,4 @@ services:
       - "8787:8787"
     env_file: .env
     # volumes:
-    #   - ./config:/config   # for CATEGORIES_FILE
+    #   - ./config:/config   # for CATEGORIES_FILE and HISTORY_DB

@@ -24,7 +24,8 @@ server checks it with Jellyfin and keeps every other password and API key to its
 7. [Choose your categories](#7-choose-your-categories)
 8. [Event channels](#8-event-channels)
 9. [The calendar](#9-the-calendar)
-10. [Troubleshooting](#10-troubleshooting)
+10. [The year in review](#10-the-year-in-review)
+11. [Troubleshooting](#11-troubleshooting)
 
 ## 1. What you need
 
@@ -156,12 +157,15 @@ The image is `ghcr.io/jcarrnah/clipstream-server:latest`. The server listens on 
 | `DISCORD_REPORT_MENTION` | optional | Who to ping with each report, e.g. `<@123456789012345678>` (Discord: Developer Mode on, right-click yourself → Copy User ID). |
 | `JELLYFIN_PUBLIC_URL` | optional | Jellyfin's public address, so a report links to the item, e.g. `https://watch.example.com`. |
 | `REPORTS_FILE` | optional | Keep reports across restarts, e.g. `/data/reports.jsonl` on a mapped volume. |
+| `JELLYFIN_API_KEY` / `HISTORY_DB` | Year in review | A Jellyfin API key (Dashboard → API Keys) and a database file on a mapped volume, e.g. `/config/history.sqlite`. The server copies Jellyfin's playback history into it and measures time actually spent playing (see step 10). Both are needed; without a volume the history is lost on every update. |
+| `WRAPPED_OPENS` | optional | The day the year in review opens (MM-DD). Default `12-01`; it closes when the year ends. `WRAPPED_PREVIEW=true` opens it for everyone now, for testing. |
 | `SEERR_URL` / `SEERR_API_KEY` | Requests | Jellyseerr's (or Seerr's) address and API key (Settings → General). The server makes requests as each signed-in Jellyfin user, so Jellyseerr's own permissions and auto-approval apply; a user who never opened Jellyseerr is imported on first use. |
 | `CHANNEL_REFRESH_SECONDS` | optional | How often the channel list is re-read. Default `120`. |
 | `GUIDE_REFRESH_SECONDS` / `GUIDE_HOURS_AHEAD` | optional | Guide refresh (default `300` s) and how far ahead it reaches (default `24` h) |
 
 Live TV turns on when the three `DISPATCHARR_*` login settings are present; the calendar when at least one of Sonarr or
-Radarr has both an address and a key; requests when both `SEERR_*` are set. Leave out what you don't use.
+Radarr has both an address and a key; requests when both `SEERR_*` are set; the year in review when
+`JELLYFIN_API_KEY` and `HISTORY_DB` are. Leave out what you don't use.
 
 ### Docker Compose
 
@@ -182,7 +186,8 @@ To use a categories file, uncomment the `volumes:` lines, put `categories.json` 
 3. **Port:** add a port mapping, container `8787` → any free host port (for example `8787`).
 4. **Variables:** add each setting from the table above as a variable.
 5. For a categories file: add a path mapping, container `/config` → a folder on your array, and set
-   `CATEGORIES_FILE=/config/categories.json`.
+   `CATEGORIES_FILE=/config/categories.json`. The same mapping holds the history database
+   (`HISTORY_DB=/config/history.sqlite`).
 6. Apply. To update later, use **Check for updates** on the Docker page.
 
 ## 4. Put it behind your Jellyfin address
@@ -297,7 +302,26 @@ With Sonarr and/or Radarr set, the app's **Calendar** shows the coming month: ne
 and the theater, digital and Blu-ray release dates of the movies Radarr monitors. Use addresses the container can
 reach (usually the LAN address and port), and each app's API key from **Settings → General**.
 
-## 10. Troubleshooting
+## 10. The year in review
+
+With `JELLYFIN_API_KEY` and `HISTORY_DB` set, every viewer gets a year in review in December: hours watched, their
+genres, top shows and movies, biggest binge, habits, and where they stand on the server. The app offers it once when it
+opens (Show me / Not now, remembered across their devices) and keeps it under Settings until the year ends. The next
+year starts from nothing.
+
+Where the numbers come from:
+
+- **Jellyfin's activity log**, copied into the database every 10 minutes (the first run copies all of it, which takes
+  a few seconds). Each item's details are saved too, so files that are replaced later (new ids) still count; items
+  that were already gone are matched by title. Plays there are timed from start to stop, capped at 110% of the
+  runtime, so pauses inflate them a little.
+- **The active sessions**, every 30 seconds: time actually playing, pauses left out. From the day the server runs
+  with these settings, this is what counts.
+
+Viewers need 2 hours and 3 plays in the year to get one. Admins can see anyone's ahead of time:
+`GET /api/wrapped?user=<Jellyfin user id>`. `/api/health` → `history` shows how much is stored and when it last synced.
+
+## 11. Troubleshooting
 
 **Live TV or Calendar doesn't show in the app.** Open `/clipstream/api/health` (step 5). If it doesn't load, the reverse
 proxy location is wrong (step 4). If it loads but the feature is `false`, a setting is missing (step 3). If you sign in
