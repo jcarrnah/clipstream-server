@@ -464,6 +464,18 @@ class Wrapped:
         month, day = (int(x) for x in self.opens.split("-"))
         return date(now.year, month, day), date(now.year + 1, 1, 1)
 
+    def seen_key(self, year: int) -> int:
+        """Where a pop-up answer is kept: answers given before the opening day (previews, testing) go under -year, so
+        they don't use up the real offer when it opens."""
+        now = datetime.now(self.tz)
+        return year if now.year != year or now.date() >= self.window(now)[0] else -year
+
+    def seen(self, user_id: str, year: int) -> str | None:
+        return self.history.seen(user_id, self.seen_key(year))
+
+    def mark_seen(self, user_id: str, year: int, state: str):
+        self.history.mark_seen(user_id, self.seen_key(year), state)
+
     def compute(self, year: int) -> dict:
         since = datetime(year, 1, 1, tzinfo=self.tz).timestamp()
         until = datetime(year + 1, 1, 1, tzinfo=self.tz).timestamp()
@@ -506,5 +518,5 @@ class Wrapped:
         if not mine or mine.seconds < MIN_SECONDS or mine.plays < MIN_PLAYS:
             return {**base, "available": False, "reason": "not_enough"}
         slides = build_slides(user_id, names.get(user_id, "You"), stats, data["infos"], year, data["shows"], data["movies"])
-        return {**base, "available": True, "seen": self.history.seen(user_id, year), "updatedAt": data["at"],
+        return {**base, "available": True, "seen": self.seen(user_id, year), "updatedAt": data["at"],
                 "slides": slides}

@@ -235,7 +235,7 @@ async def wrapped_seen(body: dict = Body(...), user: dict = Depends(current_user
     state = body.get("state")
     if state not in ("opened", "dismissed") or not user.get("id"):
         raise HTTPException(400, "state is opened or dismissed")
-    w.history.mark_seen(user["id"], int(body.get("year") or datetime.now().year), state)
+    w.mark_seen(user["id"], int(body.get("year") or datetime.now().year), state)
     return {"ok": True}
 
 

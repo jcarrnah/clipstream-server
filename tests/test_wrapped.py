@@ -115,3 +115,16 @@ def test_gone_channels():
         assert looks_like_channel(name), name
     for name in ("FBI - Most Wanted Man", "Loot - Joyride", "Mission: Impossible - Fallout"):
         assert not looks_like_channel(name), name
+
+
+def test_preview_answers_kept_apart(tmp_path):
+    h = History(str(tmp_path / "h.sqlite"), "http://jellyfin", "key")
+    year = datetime.now(TZ).year
+    before = Wrapped(h, "America/New_York", "12-31", preview_all=True)
+    opened = Wrapped(h, "America/New_York", "01-01", preview_all=False)
+    if datetime.now(TZ).date() < date(year, 12, 31):
+        before.mark_seen("u", year, "opened")
+        assert before.seen("u", year) == "opened"
+        assert opened.seen("u", year) is None  # a preview answer doesn't use up the real offer
+    opened.mark_seen("u", year, "dismissed")
+    assert opened.seen("u", year) == "dismissed"
